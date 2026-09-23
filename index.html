@@ -258,10 +258,29 @@
 
 <script>
 // ---- configuration -------------------------------------------------
-// ---- configuration -------------------------------------------------
 const MEDIA_DIR = 'photos';
 const THUMB_DIR = `${MEDIA_DIR}/thumbs`;
 const MANIFEST_FILE = 'photos.json';
+
+const PHOTO_EXT = ['jpg','jpeg','png','gif','webp','bmp'];
+const VIDEO_EXT = ['mp4','mov','webm','m4v'];
+
+// ---- application state ----------------------------------------------
+let ITEMS = [];
+let filtered = [];
+let current = 0;
+let slideshowTimer = null;
+
+const SLIDE_MS = 5000;
+
+// ---- DOM elements ---------------------------------------------------
+const grid = document.getElementById('grid');
+const lightbox = document.getElementById('lightbox');
+const lbMedia = document.getElementById('lbMedia');
+const lbCounter = document.getElementById('lbCounter');
+const lbCaption = document.getElementById('lbCaption');
+const lbSlideshowBtn = document.getElementById('lbSlideshow');
+const playAllBtn = document.getElementById('playAllBtn');
 
 async function fetchMediaList(){
   const res = await fetch(MANIFEST_FILE, { cache: 'no-cache' });
