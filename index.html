@@ -270,52 +270,30 @@ const REPO_BRANCH = 'main';
 const PHOTO_EXT = ['jpg','jpeg','png','gif','webp','bmp'];
 const VIDEO_EXT = ['mp4','mov','webm','m4v'];
 
-function detectRepoInfo(){
-  const host = location.hostname; // e.g. username.github.io
-  const owner = REPO_OWNER || host.split('.')[0];
-  const pathParts = location.pathname.split('/').filter(Boolean);
-  // Project page: username.github.io/REPO/... -> pathParts[0] is the repo.
-  // User/org page: username.github.io/... -> the repo IS the host itself.
-  const repo = REPO_NAME || (pathParts.length ? pathParts[0] : host);
-  return { owner, repo };
-}
-
 async function fetchMediaList(){
-  const { owner, repo } = detectRepoInfo();
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${MEDIA_DIR}?ref=${REPO_BRANCH}`;
-  const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github+json' } });
-  if(!res.ok){
-    throw new Error(`GitHub API ${res.status}: ${res.statusText}`);
-  }
-  const entries = await res.json();
-  const items = entries
-    .filter(e => e.type === 'file')
-    .map(e => {
-      const ext = (e.name.split('.').pop() || '').toLowerCase();
-      let kind = null;
-      if(PHOTO_EXT.includes(ext)) kind = 'photo';
-      else if(VIDEO_EXT.includes(ext)) kind = 'video';
-      return kind ? { src: `${MEDIA_DIR}/${e.name}`, type: kind, name: e.name } : null;
-    })
-    .filter(Boolean)
-    .sort((a,b)=> a.name.localeCompare(b.name, undefined, {numeric:true}));
-  return items;
+  const res = await fetch(MANIFEST_FILE, { cache: 'no-cache' });
+  if(!res.ok) throw new Error(`Cannot load ${MANIFEST_FILE}: HTTP ${res.status}`);
+
+  const data = await res.json();
+
+  // Manifest format:
+  // [
+  //   { "name": "DSC_0001.JPG", "type": "photo", "src": "photos/DSC_0001.JPG", "thumb": "photos/thumbs/DSC_0001.webp" }
+  // ]
+  if(!Array.isArray(data)) throw new Error(`${MANIFEST_FILE} is not an array`);
+
+  return data
+    .filter(e => e && e.name && (e.type === 'photo' || e.type === 'video'))
+    .map(e => ({
+      name: e.name,
+      type: e.type,
+      src: e.src || `${MEDIA_DIR}/${encodeURIComponent(e.name)}`,
+      thumb: e.thumb || (e.type === 'photo'
+        ? `${THUMB_DIR}/${encodeURIComponent(e.name.replace(/\.[^.]+$/, ''))}.webp`
+        : null)
+    }))
+    .sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true}));
 }
-
-let ITEMS = [];
-
-const grid = document.getElementById('grid');
-const lightbox = document.getElementById('lightbox');
-const lbMedia = document.getElementById('lbMedia');
-const lbCounter = document.getElementById('lbCounter');
-const lbCaption = document.getElementById('lbCaption');
-const lbSlideshowBtn = document.getElementById('lbSlideshow');
-const playAllBtn = document.getElementById('playAllBtn');
-
-let filtered = [];
-let current = 0;
-let slideshowTimer = null;
-const SLIDE_MS = 3500;
 
 function updateStats(){
   document.getElementById('statPhotos').textContent = ITEMS.filter(i=>i.type==='photo').length;
@@ -352,7 +330,7 @@ function playIconSVG(){
 }
 
 // ---- batched / lazy grid rendering ---------------------------------
-const BATCH_SIZE = 36;
+const BATCH_SIZE = 24;
 let renderedCount = 0;
 let batchObserver = null;
 let cellObserver = null; // reveals video src only once a cell is near view
@@ -367,7 +345,13 @@ function makeCell(item, i){
     img.loading = 'lazy';
     img.decoding = 'async';
     img.alt = item.name;
-    img.src = item.src; // native lazy-loading defers the actual fetch
+    img.src = item.thumb || item.src;
+    if(item.thumb){
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = item.src;
+      };
+    } // native lazy-loading defers the actual fetch
     cell.appendChild(img);
   } else {
     // Video source is only attached once the cell scrolls near the
@@ -429,7 +413,7 @@ function renderNextBatch(){
     if(batchObserver) batchObserver.disconnect();
     batchObserver = new IntersectionObserver((entries)=>{
       if(entries[0].isIntersecting) renderNextBatch();
-    }, { rootMargin: '800px 0px' });
+    }, { rootMargin: '400px 0px' });
     batchObserver.observe(newSentinel);
   } else if(batchObserver){
     batchObserver.disconnect();
