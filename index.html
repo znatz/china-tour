@@ -258,17 +258,10 @@
 
 <script>
 // ---- configuration -------------------------------------------------
-// Folder (relative to this file) to scan for photos/videos.
+// ---- configuration -------------------------------------------------
 const MEDIA_DIR = 'photos';
-// Leave these null to auto-detect from the page URL (works for both
-// project pages: USER.github.io/REPO/ and user pages: USER.github.io/).
-// Set them manually only if auto-detection doesn't match your repo.
-const REPO_OWNER = null;
-const REPO_NAME  = null;
-const REPO_BRANCH = 'main';
-
-const PHOTO_EXT = ['jpg','jpeg','png','gif','webp','bmp'];
-const VIDEO_EXT = ['mp4','mov','webm','m4v'];
+const THUMB_DIR = `${MEDIA_DIR}/thumbs`;
+const MANIFEST_FILE = 'photos.json';
 
 async function fetchMediaList(){
   const res = await fetch(MANIFEST_FILE, { cache: 'no-cache' });
