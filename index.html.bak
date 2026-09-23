@@ -351,101 +351,35 @@ function playIconSVG(){
   return '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
 }
 
-// ---- batched / lazy grid rendering ---------------------------------
-const BATCH_SIZE = 36;
-let renderedCount = 0;
-let batchObserver = null;
-let cellObserver = null; // reveals video src only once a cell is near view
-
-function makeCell(item, i){
-  const cell = document.createElement('div');
-  cell.className = 'cell';
-  cell.addEventListener('click', ()=>openLightbox(i));
-
-  if(item.type === 'photo'){
-    const img = document.createElement('img');
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    img.alt = item.name;
-    img.src = item.src; // native lazy-loading defers the actual fetch
-    cell.appendChild(img);
-  } else {
-    // Video source is only attached once the cell scrolls near the
-    // viewport (see cellObserver below), so 11 videos don't all start
-    // buffering the moment the page loads.
-    const vid = document.createElement('video');
-    vid.muted = true;
-    vid.dataset.src = item.src;
-    cell.appendChild(vid);
-    const badge = document.createElement('div');
-    badge.className = 'badge';
-    badge.innerHTML = playIconSVG();
-    cell.appendChild(badge);
-    cellObserver.observe(vid);
-  }
-
-  const idx = document.createElement('div');
-  idx.className = 'idx';
-  idx.textContent = i + 1;
-  cell.appendChild(idx);
-  return cell;
-}
-
-function ensureCellObserver(){
-  if(cellObserver) return;
-  cellObserver = new IntersectionObserver((entries)=>{
-    entries.forEach(entry=>{
-      if(entry.isIntersecting){
-        const vid = entry.target;
-        if(vid.dataset.src){
-          vid.preload = 'metadata';
-          vid.src = vid.dataset.src;
-          delete vid.dataset.src;
-        }
-        cellObserver.unobserve(vid);
-      }
-    });
-  }, { rootMargin: '600px 0px' });
-}
-
-function renderNextBatch(){
-  const sentinel = document.getElementById('gridSentinel');
-  if(sentinel) sentinel.remove();
-
-  const end = Math.min(renderedCount + BATCH_SIZE, filtered.length);
-  const frag = document.createDocumentFragment();
-  for(let i = renderedCount; i < end; i++){
-    frag.appendChild(makeCell(filtered[i], i));
-  }
-  grid.appendChild(frag);
-  renderedCount = end;
-
-  if(renderedCount < filtered.length){
-    const newSentinel = document.createElement('div');
-    newSentinel.id = 'gridSentinel';
-    newSentinel.style.gridColumn = '1/-1';
-    newSentinel.style.height = '1px';
-    grid.appendChild(newSentinel);
-    if(batchObserver) batchObserver.disconnect();
-    batchObserver = new IntersectionObserver((entries)=>{
-      if(entries[0].isIntersecting) renderNextBatch();
-    }, { rootMargin: '800px 0px' });
-    batchObserver.observe(newSentinel);
-  } else if(batchObserver){
-    batchObserver.disconnect();
-  }
-}
-
 function renderGrid(){
   grid.innerHTML = '';
-  renderedCount = 0;
-  if(batchObserver){ batchObserver.disconnect(); batchObserver = null; }
-  ensureCellObserver();
-  if(filtered.length === 0){
-    showGridMessage('該当する項目がありません。');
-    return;
-  }
-  renderNextBatch();
+  filtered.forEach((item, i)=>{
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.addEventListener('click', ()=>openLightbox(i));
+    if(item.type === 'photo'){
+      const img = document.createElement('img');
+      img.src = item.src;
+      img.loading = 'lazy';
+      img.alt = item.name;
+      cell.appendChild(img);
+    } else {
+      const vid = document.createElement('video');
+      vid.src = item.src;
+      vid.preload = 'metadata';
+      vid.muted = true;
+      cell.appendChild(vid);
+      const badge = document.createElement('div');
+      badge.className = 'badge';
+      badge.innerHTML = playIconSVG();
+      cell.appendChild(badge);
+    }
+    const idx = document.createElement('div');
+    idx.className = 'idx';
+    idx.textContent = i + 1;
+    cell.appendChild(idx);
+    grid.appendChild(cell);
+  });
 }
 
 function setFilter(kind){
